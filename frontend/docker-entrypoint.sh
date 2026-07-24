@@ -4,7 +4,9 @@ set -e
 CERT_DIR="/etc/nginx/certs"
 
 # ─── 1. Processar template nginx com envsubst ──────────────────────────────────
-envsubst '$BACKEND_HOST $BACKEND_PORT $KC_ORIGIN' \
+export HTTPS_PORT=${HTTPS_PORT:-443}
+
+envsubst '$BACKEND_HOST $BACKEND_PORT $KC_ORIGIN $HTTPS_PORT' \
   < /etc/nginx/templates/default.conf.template \
   > /etc/nginx/conf.d/default.conf
 

@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  # ─────────────────────────────────────────────
+  # Database Service (PostgreSQL)
+  # ─────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: r7-inventory-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-ioc}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-iocdb}
+    volumes:
+      - db_data_r7:/var/lib/postgresql/data
+    networks:
+      - r7net
+    # No port binding to the host for production security.
+    # Connections are only permitted via the virtual bridge network 'r7net'.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-ioc} -d $${POSTGRES_DB:-iocdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ─────────────────────────────────────────────
+  # Backend API Service (Node.js)
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: r7-inventory-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgres://${DB_USER:-ioc}:${DB_PASSWORD}@db:5432/${DB_NAME:-iocdb}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-30d}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - MFA_APP_NAME=${MFA_APP_NAME:-"CWO Inventory Manager"}
+      - BCRYPT_ROUNDS=${BCRYPT_ROUNDS:-12}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - r7net
+    # Port is not exposed to host. Frontend Nginx acts as the single reverse proxy gateway.
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ─────────────────────────────────────────────
+  # Frontend Web & Reverse Proxy Service (Nginx)
+  # ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=/api
+        - VITE_KC_URL=${VITE_KC_URL}
+        - VITE_KC_REALM=${VITE_KC_REALM}
+        - VITE_KC_CLIENT_ID=${VITE_KC_CLIENT_ID}
+    container_name: r7-inventory-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      - BACKEND_HOST=api
+      - BACKEND_PORT=3000
+      - KC_ORIGIN=${KC_ORIGIN}
+      - HTTPS_PORT=${HTTPS_PORT:-443}
+    volumes:
+      # Mount production SSL certificates (fullchain.pem & privkey.pem)
+      - ${SSL_CERTS_DIR:-/etc/ssl/inventory}:/etc/nginx/certs:ro
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    networks:
+      - r7net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  r7net:
+    driver: bridge
+
+volumes:
+  db_data_r7:
+    name: r7-inventory-db-data
