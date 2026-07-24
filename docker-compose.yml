@@ -1,0 +1,98 @@
+services:
+  # ─────────────────────────────────────────────
+  # Banco de dados PostgreSQL
+  # ─────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ioc
+      POSTGRES_PASSWORD: iocpass
+      POSTGRES_DB: iocdb
+    volumes:
+      - db_data_r7:/var/lib/postgresql/data
+    networks:
+      - r7net
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ioc -d iocdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ─────────────────────────────────────────────
+  # Backend Node.js (API)
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env.example
+    environment:
+      - DATABASE_URL=postgres://ioc:iocpass@db:5432/iocdb
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - r7net
+    ports:
+      - "3001:3000"
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Frontend React (Vite build + Nginx)
+  # ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ""
+    depends_on:
+      - api
+    environment:
+      BACKEND_HOST: api
+      BACKEND_PORT: 3000
+    networks:
+      - r7net
+    ports:
+      - "81:80"
+      - "4546:443"
+    restart: unless-stopped
+
+  glpidb:
+    image: mariadb:10.11
+    environment:
+      - MARIADB_ROOT_PASSWORD=glpirootpass
+      - MARIADB_DATABASE=glpidb
+      - MARIADB_USER=glpi
+      - MARIADB_PASSWORD=glpipass
+    volumes:
+      - glpi_db_data:/var/lib/mysql
+    networks:
+      - r7net
+
+  glpi:
+    image: glpi/glpi:latest
+    ports:
+      - "82:80"
+    environment:
+      - GLPI_DB_HOST=glpidb
+      - GLPI_DB_PORT=3306
+      - GLPI_DB_NAME=glpidb
+      - GLPI_DB_USER=glpi
+      - GLPI_DB_PASSWORD=glpipass
+    volumes:
+      - glpi_data:/var/glpi
+    depends_on:
+      - glpidb
+    networks:
+      - r7net
+
+networks:
+  r7net:
+    driver: bridge
+
+volumes:
+  db_data_r7:
+  glpi_db_data:
+  glpi_data:
