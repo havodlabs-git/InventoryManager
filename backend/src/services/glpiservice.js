@@ -51,7 +51,6 @@ function isConfigured(config) {
     config &&
     config.enabled &&
     config.glpi_url &&
-    config.app_token &&
     config.user_token
   );
 }
@@ -59,13 +58,16 @@ function isConfigured(config) {
 /** Inicia sessão na API do GLPI e retorna o session_token */
 async function initSession(config) {
   const baseUrl = normalizeGlpiUrl(config.glpi_url);
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `user_token ${config.user_token}`
+  };
+  if (config.app_token) {
+    headers["App-Token"] = config.app_token;
+  }
   const res = await glpiFetch(`${baseUrl}/apirest.php/initSession`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      "App-Token": config.app_token,
-      "Authorization": `user_token ${config.user_token}`
-    }
+    headers
   });
 
   const data = await res.json().catch(() => ({}));
@@ -82,12 +84,15 @@ async function initSession(config) {
 async function killSession(config, sessionToken) {
   try {
     const baseUrl = normalizeGlpiUrl(config.glpi_url);
+    const headers = {
+      "Session-Token": sessionToken
+    };
+    if (config.app_token) {
+      headers["App-Token"] = config.app_token;
+    }
     await glpiFetch(`${baseUrl}/apirest.php/killSession`, {
       method: "GET",
-      headers: {
-        "App-Token": config.app_token,
-        "Session-Token": sessionToken
-      }
+      headers
     });
   } catch {
     /* best-effort: não falha a operação principal */
@@ -130,12 +135,16 @@ async function uploadDocument(config, sessionToken, file) {
     file.originalname || "hosts_batch.csv"
   );
 
+  const headers = {
+    "Session-Token": sessionToken
+  };
+  if (config.app_token) {
+    headers["App-Token"] = config.app_token;
+  }
+
   const res = await glpiFetch(`${baseUrl}/apirest.php/Document`, {
     method: "POST",
-    headers: {
-      "App-Token": config.app_token,
-      "Session-Token": sessionToken
-    },
+    headers,
     body: formData
   });
 
@@ -153,13 +162,17 @@ async function uploadDocument(config, sessionToken, file) {
  */
 async function linkDocumentToTicket(config, sessionToken, ticketId, documentId) {
   const baseUrl = normalizeGlpiUrl(config.glpi_url);
+  const headers = {
+    "Content-Type": "application/json",
+    "Session-Token": sessionToken
+  };
+  if (config.app_token) {
+    headers["App-Token"] = config.app_token;
+  }
+
   const res = await glpiFetch(`${baseUrl}/apirest.php/Document_Item`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "App-Token": config.app_token,
-      "Session-Token": sessionToken
-    },
+    headers,
     body: JSON.stringify({
       input: {
         items_id: Number(ticketId),
@@ -218,13 +231,17 @@ async function createTicket(config, { actionType, hostName, os, criticality, bu 
           `Ticket aberto automaticamente pelo Inventory Manager.`
         ].join("\n");
 
+    const headers = {
+      "Content-Type": "application/json",
+      "Session-Token": sessionToken
+    };
+    if (config.app_token) {
+      headers["App-Token"] = config.app_token;
+    }
+
     const res = await glpiFetch(`${baseUrl}/apirest.php/Ticket`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "App-Token": config.app_token,
-        "Session-Token": sessionToken
-      },
+      headers,
       body: JSON.stringify({
         input: {
           name,
@@ -274,13 +291,17 @@ async function getLastTicketComment(config, glpiTicketId) {
 
   try {
     const baseUrl = normalizeGlpiUrl(config.glpi_url);
+    const headers = {
+      "Content-Type": "application/json",
+      "Session-Token": sessionToken
+    };
+    if (config.app_token) {
+      headers["App-Token"] = config.app_token;
+    }
+
     const res = await glpiFetch(`${baseUrl}/apirest.php/Ticket/${glpiTicketId}/ITILFollowup/`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "App-Token": config.app_token,
-        "Session-Token": sessionToken
-      }
+      headers
     });
 
     const data = await res.json().catch(() => []);

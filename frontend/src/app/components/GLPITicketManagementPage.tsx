@@ -56,7 +56,7 @@ export default function GLPITicketManagementPage({
   // ── Configuração GLPI (credenciais) ──
   const [config, setConfig] = useState<GLPIConfigRecord | null>(null);
 
-  const isConfigured = Boolean(config?.enabled && config?.glpi_url && config?.app_token && config?.user_token);
+  const isConfigured = Boolean(config?.enabled && config?.glpi_url && config?.user_token);
 
   const loadConfig = useCallback(async () => {
     try {

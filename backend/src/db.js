@@ -274,8 +274,30 @@ async function initDb() {
         [uuidv4(), defaultCustomerId]
       );
       
+      // 4. Inserir Configuração GLPI padrão
+      await client.query(
+        `INSERT INTO glpi_configs (id, customer_id, glpi_url, app_token, user_token, enabled, updated_at)
+         VALUES ($1, $2, $3, $4, $5, TRUE, NOW())`,
+        [uuidv4(), defaultCustomerId, 'https://itsm.cwo.com.pt/', null, '6oyp1BXUORAmPUuBYAsdOhs6672OvxDytFkxMTth']
+      );
+      
       console.log("[DB] Seeding default CWO tenant and user successfully completed.");
     }
+
+    // Garantir que a configuração do GLPI para o cliente padrão está atualizada com as credenciais de produção
+    await client.query(
+      `INSERT INTO glpi_configs (id, customer_id, glpi_url, app_token, user_token, enabled, updated_at)
+       VALUES ($1, $2, $3, NULL, $4, TRUE, NOW())
+       ON CONFLICT (customer_id)
+       DO UPDATE SET
+         glpi_url = EXCLUDED.glpi_url,
+         app_token = EXCLUDED.app_token,
+         user_token = EXCLUDED.user_token,
+         enabled = TRUE,
+         updated_at = NOW()
+       WHERE glpi_configs.glpi_url IS NULL OR glpi_configs.glpi_url != EXCLUDED.glpi_url OR glpi_configs.user_token != EXCLUDED.user_token`,
+      [uuidv4(), defaultCustomerId, 'https://itsm.cwo.com.pt/', '6oyp1BXUORAmPUuBYAsdOhs6672OvxDytFkxMTth']
+    );
 
     await client.query("COMMIT");
     console.log("[DB] Schema de Inventário inicializado com sucesso.");

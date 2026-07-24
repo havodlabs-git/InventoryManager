@@ -664,7 +664,7 @@ router.post("/glpi-config/test", requireUser(), requirePermission("customer:info
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const config = await glpiService.getGlpiConfig(customerId);
-    if (!config || !config.glpi_url || !config.app_token || !config.user_token) {
+    if (!config || !config.glpi_url || !config.user_token) {
       return res.status(409).json({ error: "GLPI_NOT_CONFIGURED" });
     }
 
