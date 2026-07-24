@@ -10,7 +10,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${DB_USER:-ioc}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-iocpass}
       POSTGRES_DB: ${DB_NAME:-iocdb}
     volumes:
       - db_data_r7:/var/lib/postgresql/data
@@ -49,10 +49,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=postgres://${DB_USER:-ioc}:${DB_PASSWORD}@db:5432/${DB_NAME:-iocdb}
-      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=postgres://${DB_USER:-ioc}:${DB_PASSWORD:-iocpass}@db:5432/${DB_NAME:-iocdb}
+      - JWT_SECRET=${JWT_SECRET:-4d4efe773e4dec77dc53e879f0dd81d3b6c5d4f61a0343385c33bc44216db2bba8a81d9d9148b98ca75343f5193bb0eb79ff044b5f7d505a82f0b05a78afa629}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-30d}
-      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-minha-chave-felipe}
       - MFA_APP_NAME=${MFA_APP_NAME:-"CWO Inventory Manager"}
       - BCRYPT_ROUNDS=${BCRYPT_ROUNDS:-12}
     depends_on:
@@ -84,9 +84,9 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_API_URL=/api
-        - VITE_KC_URL=${VITE_KC_URL}
-        - VITE_KC_REALM=${VITE_KC_REALM}
-        - VITE_KC_CLIENT_ID=${VITE_KC_CLIENT_ID}
+        - VITE_KC_URL=${VITE_KC_URL:-http://localhost:8180}
+        - VITE_KC_REALM=${VITE_KC_REALM:-cwo}
+        - VITE_KC_CLIENT_ID=${VITE_KC_CLIENT_ID:-inventory-manager}
     container_name: r7-inventory-frontend
     restart: unless-stopped
     depends_on:
@@ -94,11 +94,11 @@ services:
     environment:
       - BACKEND_HOST=api
       - BACKEND_PORT=3000
-      - KC_ORIGIN=${KC_ORIGIN}
+      - KC_ORIGIN=${KC_ORIGIN:-http://localhost:8180}
       - HTTPS_PORT=${HTTPS_PORT:-443}
     volumes:
-      # Mount production SSL certificates (fullchain.pem & privkey.pem)
-      - ${SSL_CERTS_DIR:-/etc/ssl/inventory}:/etc/nginx/certs:ro
+      # Mount SSL certs (writeable so Nginx entrypoint can auto-generate self-signed certs if missing)
+      - ${SSL_CERTS_DIR:-./certs}:/etc/nginx/certs
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
