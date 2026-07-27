@@ -90,9 +90,8 @@ export default function App() {
 
   // Customer Mode
   const [auth, setAuth] = useState<AuthData | null>(loadAuth);
-  // SSO Portal CWO: true enquanto tentamos entrar via sessão do portal (Keycloak)
-  // Forçamos o SSO sempre que não há sessão local, a menos que seja um pedido de admin
-  const [ssoChecking, setSsoChecking] = useState<boolean>(() => !loadAuth() && !isAdminRequest);
+  // SSO Portal CWO: desativado por agora (sempre false)
+  const [ssoChecking, setSsoChecking] = useState<boolean>(false);
   const [activePage, setActivePage] = useState<PageId>('dashboard');
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
@@ -230,11 +229,6 @@ export default function App() {
     setAuth(null);
     setAssets([]);
     setActivePage('dashboard');
-    // Termina também a sessão central do portal (Keycloak); ao voltar,
-    // a app redireciona para a página de login central.
-    ssoLogout().catch(err => {
-      console.error("[SSO] Erro ao efetuar logout no Keycloak:", err);
-    });
   };
 
   const handleAdminLogout = () => {
