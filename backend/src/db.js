@@ -1,3 +1,4 @@
+const { v4: uuidv4 } = require("uuid");
 /**
  * db.js — Inicialização da base de dados com suporte RBAC e Multi-Tenancy para o Rapid7 Inventory Manager
  */
