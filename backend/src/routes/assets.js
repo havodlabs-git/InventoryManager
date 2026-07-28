@@ -31,10 +31,17 @@ function parseBool(v, defaultValue) {
   return ["1", "true", "yes", "y", "on"].includes(s);
 }
 
+function getCustomerId(req) {
+  if (req.auth && req.auth.type === "admin") {
+    return req.query.customerId || req.body.customerId || req.auth.customerId;
+  }
+  return req.auth ? req.auth.customerId : null;
+}
+
 // ─── GET /api/assets/list ────────────────────────────────────────────────────
 router.get("/list", requireUser(), requirePermission("asset:list"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.query.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const { search, type, module, status, riskLevel } = req.query;
@@ -97,7 +104,7 @@ router.get("/list", requireUser(), requirePermission("asset:list"), async (req, 
 // ─── POST /api/assets/add (Manual) ───────────────────────────────────────────
 router.post("/add", requireUser(), requirePermission("asset:create"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const { name, type, ipAddress, macAddress, os, riskScore, vulnerabilitiesCount } = req.body || {};
@@ -148,7 +155,7 @@ router.post("/add", requireUser(), requirePermission("asset:create"), async (req
 router.delete("/:id", requireUser(), requirePermission("asset:delete"), async (req, res) => {
   try {
     const { id } = req.params;
-    const customerId = req.auth.type === "admin" ? req.query.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
 
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
@@ -169,7 +176,7 @@ router.delete("/:id", requireUser(), requirePermission("asset:delete"), async (r
 // ─── GET /api/assets/config (Rapid7 Connection Configurations) ───────────────
 router.get("/config", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.query.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const r = await pool.query(
@@ -199,7 +206,7 @@ router.get("/config", requireUser(), requirePermission("customer:info"), async (
 // ─── PUT /api/assets/config (Update Rapid7 Configuration) ────────────────────
 router.put("/config", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const body = req.body || {};
@@ -290,7 +297,7 @@ router.put("/config", requireUser(), requirePermission("customer:info"), async (
 // ─── POST /api/assets/sync (Trigger Rapid7 Synchronization) ──────────────────
 router.post("/sync", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     // Dispara a sincronização de forma assíncrona (background task)
@@ -308,7 +315,7 @@ router.post("/sync", requireUser(), requirePermission("customer:info"), async (r
 // ─── GET /api/assets/sync-logs (Get Realtime Sync Logs) ──────────────────────
 router.get("/sync-logs", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.query.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const logs = getLogs(customerId);
@@ -321,7 +328,7 @@ router.get("/sync-logs", requireUser(), requirePermission("customer:info"), asyn
 // ─── POST /api/assets/import-excel (Upload and Parse Excel Spreadsheet) ──────
 router.post("/import-excel", requireUser(), requirePermission("asset:create"), upload.single("file"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     if (!req.file) {
@@ -428,7 +435,7 @@ router.post("/import-excel", requireUser(), requirePermission("asset:create"), u
 // 1. POST /api/assets/removal-requests (Criar solicitação)
 router.post("/removal-requests", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     const { assetId, reason } = req.body;
 
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
@@ -467,7 +474,7 @@ router.post("/removal-requests", requireUser(), requirePermission("customer:info
 // 2. GET /api/assets/removal-requests (Listar solicitações do cliente)
 router.get("/removal-requests", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.query.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const r = await pool.query(
@@ -576,7 +583,7 @@ function maskGlpiConfig(config) {
 // ─── GET /api/assets/glpi-config ─────────────────────────────────────────────
 router.get("/glpi-config", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.query.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const config = await glpiService.getGlpiConfig(customerId);
@@ -601,7 +608,7 @@ router.get("/glpi-config", requireUser(), requirePermission("customer:info"), as
 // ─── PUT /api/assets/glpi-config ─────────────────────────────────────────────
 router.put("/glpi-config", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const body = req.body || {};
@@ -660,7 +667,7 @@ router.put("/glpi-config", requireUser(), requirePermission("customer:info"), as
 // ─── POST /api/assets/glpi-config/test ───────────────────────────────────────
 router.post("/glpi-config/test", requireUser(), requirePermission("customer:info"), async (req, res) => {
   try {
-    const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const config = await glpiService.getGlpiConfig(customerId);
@@ -685,11 +692,11 @@ router.post("/glpi-config/test", requireUser(), requirePermission("customer:info
 // ─── POST /api/assets/glpi-tickets ──────────────────────────────────────────
 router.post("/glpi-tickets", requireUser(), requirePermission("asset:create"), async (req, res) => {
   try {
-    const customerId = req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
-    const { actionType, hostName, os, criticality, bu } = req.body || {};
-    if (!actionType || !['ADD', 'REMOVE'].includes(actionType)) {
+    const { actionType, hostName, os, criticality, bu, comments, assetId, automate, assetChanges } = req.body || {};
+    if (!actionType || !['ADD', 'REMOVE', 'UPDATE'].includes(actionType)) {
       return res.status(400).json({ error: "INVALID_ACTION_TYPE" });
     }
     if (!hostName || !hostName.trim()) {
@@ -718,7 +725,8 @@ router.post("/glpi-tickets", requireUser(), requirePermission("asset:create"), a
         hostName: hostName.trim(),
         os: os.trim(),
         criticality,
-        bu
+        bu,
+        comments
       });
     } catch (glpiErr) {
       console.error("[GLPI API error]", glpiErr);
@@ -728,10 +736,24 @@ router.post("/glpi-tickets", requireUser(), requirePermission("asset:create"), a
     const ticketId = uuidv4();
 
     const r = await pool.query(
-      `INSERT INTO glpi_tickets (id, customer_id, action_type, host_name, os, criticality, bu, status, ticket_number, glpi_ticket_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'OPEN', $8, $9, NOW(), NOW())
+      `INSERT INTO glpi_tickets (id, customer_id, action_type, host_name, os, criticality, bu, status, ticket_number, glpi_ticket_id, comments, asset_id, automate, asset_changes, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'OPEN', $8, $9, $10, $11, $12, $13, NOW(), NOW())
        RETURNING *`,
-      [ticketId, customerId, actionType, hostName.trim(), os.trim(), criticality, bu, glpiResult.ticketNumber, glpiResult.glpiId]
+      [
+        ticketId,
+        customerId,
+        actionType,
+        hostName.trim(),
+        os.trim(),
+        criticality,
+        bu,
+        glpiResult.ticketNumber,
+        glpiResult.glpiId,
+        comments || null,
+        assetId || null,
+        automate || false,
+        assetChanges ? JSON.stringify(assetChanges) : null
+      ]
     );
 
     return res.status(201).json({ success: true, data: r.rows[0] });
@@ -861,7 +883,7 @@ async function enrichTicketsWithLastComment(customerId, tickets) {
 // ─── GET /api/assets/glpi-tickets ───────────────────────────────────────────
 router.get("/glpi-tickets", requireUser(), requirePermission("asset:list"), async (req, res) => {
   try {
-    const customerId = req.auth.customerId;
+    const customerId = getCustomerId(req);
     if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
 
     const r = await pool.query(
@@ -915,6 +937,38 @@ router.post("/glpi-tickets/:id/status", requireUser(), requirePermission("custom
 
     if (r.rowCount === 0) {
       return res.status(404).json({ error: "TICKET_NOT_FOUND" });
+    }
+
+    // Se o chamado foi resolvido e automação está habilitada, aplicar as alterações ao asset correspondente
+    if (status === 'RESOLVED') {
+      const ticket = r.rows[0];
+      if (ticket.automate && ticket.asset_id && ticket.asset_changes) {
+        try {
+          const changes = typeof ticket.asset_changes === 'string' ? JSON.parse(ticket.asset_changes) : ticket.asset_changes;
+          const allowedFields = ['name', 'type', 'ip_address', 'mac_address', 'os', 'status', 'version', 'connection', 'last_seen'];
+          
+          const fields = [];
+          const values = [];
+          let idx = 1;
+
+          for (const [key, val] of Object.entries(changes)) {
+            if (allowedFields.includes(key)) {
+              fields.push(`${key} = $${idx}`);
+              values.push(val);
+              idx++;
+            }
+          }
+
+          if (fields.length > 0) {
+            values.push(ticket.asset_id);
+            const queryStr = `UPDATE assets SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${idx}`;
+            await pool.query(queryStr, values);
+            console.log(`[AUTOMATION] Asset ${ticket.asset_id} updated successfully via Ticket ${id}`);
+          }
+        } catch (autoErr) {
+          console.error(`[AUTOMATION] Falha ao atualizar automaticamente asset ${ticket.asset_id} do Ticket ${id}:`, autoErr);
+        }
+      }
     }
 
     return res.status(200).json({ success: true, data: r.rows[0] });

@@ -544,11 +544,15 @@ export async function testGLPIConnection(
 
 export async function createGLPITicket(
   ticket: {
-    actionType: 'ADD' | 'REMOVE';
+    actionType: 'ADD' | 'REMOVE' | 'UPDATE';
     hostName: string;
     os: string;
     criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY HIGH';
     bu: 'itcorp' | 'plural' | 'mcd' | 'bit';
+    comments?: string;
+    assetId?: string;
+    automate?: boolean;
+    assetChanges?: any;
   },
   token: string
 ): Promise<{ success: boolean; data: GLPITicketRecord }> {

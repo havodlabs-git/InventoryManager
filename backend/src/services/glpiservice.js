@@ -7,6 +7,31 @@
 
 const { pool } = require("../db");
 
+if (!process.env.DATABASE_URL) {
+  console.log("[GLPI_SERVICE] DATABASE_URL não definido. Ativando MOCK GLPI SERVICE.");
+  module.exports = {
+    getGlpiConfig: async (customerId) => ({
+      id: "mock-glpi-config-id",
+      customer_id: customerId,
+      glpi_url: "http://mock-glpi.local",
+      user_token: "mock-token",
+      enabled: true
+    }),
+    isConfigured: () => true,
+    testConnection: async () => true,
+    createTicket: async (config, { actionType, hostName, os, criticality, bu, comments }, file = null) => {
+      const glpiId = Math.floor(Math.random() * 100000) + 1000;
+      return {
+        glpiId,
+        ticketNumber: `GLPI-${glpiId}`
+      };
+    },
+    normalizeGlpiUrl: (url) => url,
+    getLastTicketComment: async () => "Mocked GLPI Resolution Comment"
+  };
+  return;
+}
+
 const REQUEST_TIMEOUT_MS = 15000;
 
 // Mapeamento Criticidade → Urgência GLPI (1=Muito Baixa ... 5=Muito Alta)
@@ -195,12 +220,12 @@ async function linkDocumentToTicket(config, sessionToken, ticketId, documentId) 
  * Cria um ticket real no GLPI.
  * @returns {{ glpiId: number, ticketNumber: string }}
  */
-async function createTicket(config, { actionType, hostName, os, criticality, bu }, file = null) {
+async function createTicket(config, { actionType, hostName, os, criticality, bu, comments }, file = null) {
   const sessionToken = await initSession(config);
 
   try {
     const baseUrl = normalizeGlpiUrl(config.glpi_url);
-    const actionLabel = actionType === "ADD" ? "Adição" : "Remoção";
+    const actionLabel = actionType === "ADD" ? "Adição" : (actionType === "REMOVE" ? "Remoção" : "Atualização");
     const isBatch = !!file;
 
     const name = isBatch 
@@ -227,9 +252,10 @@ async function createTicket(config, { actionType, hostName, os, criticality, bu 
           `- Sistema Operativo: ${os}`,
           `- Criticidade: ${criticality}`,
           `- Unidade de Negócio (BU): ${bu}`,
+          comments ? `- Comentários/Detalhes: ${comments}` : null,
           ``,
           `Ticket aberto automaticamente pelo Inventory Manager.`
-        ].join("\n");
+        ].filter(line => line !== null).join("\n");
 
     const headers = {
       "Content-Type": "application/json",

@@ -248,11 +248,15 @@ export default function App() {
 
   const handleSubmitTicket = async (
     ticketData: {
-      actionType: 'ADD' | 'REMOVE';
+      actionType: 'ADD' | 'REMOVE' | 'UPDATE';
       hostName: string;
       os: string;
       criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY HIGH';
       bu: 'itcorp' | 'plural' | 'mcd' | 'bit';
+      comments?: string;
+      assetId?: string;
+      automate?: boolean;
+      assetChanges?: any;
     },
     file?: File | null
   ) => {
@@ -261,7 +265,7 @@ export default function App() {
       let res;
       if (file) {
         res = await createGLPIBatchTicket({
-          actionType: ticketData.actionType,
+          actionType: ticketData.actionType as 'ADD' | 'REMOVE',
           criticality: ticketData.criticality,
           bu: ticketData.bu,
           file
@@ -339,6 +343,7 @@ export default function App() {
       {activePage === 'dashboard' && (
         <DashboardPage
           assets={assets}
+          tickets={tickets}
           loading={loadingAssets}
           onRefresh={handleRefresh}
           customerName={settings.displayName || auth.customerName}

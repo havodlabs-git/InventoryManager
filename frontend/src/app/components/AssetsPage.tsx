@@ -11,7 +11,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import type { AssetRecord } from '@/app/services/api';
-import { addAssetManual, deleteAsset, createRemovalRequest } from '@/app/services/api';
+import { addAssetManual, deleteAsset, createRemovalRequest, createGLPITicket } from '@/app/services/api';
 import { Toaster, toast } from 'sonner';
 
 const getSimpleOS = (os: string | null | undefined): 'Windows' | 'Linux' => {
@@ -77,6 +77,27 @@ export function AssetsPage({
   const [requestAssetName, setRequestAssetName] = useState('');
   const [requestReason, setRequestReason] = useState('');
   const [requestLoading, setRequestLoading] = useState(false);
+
+  // Modal Edição e Chamado
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editAsset, setEditAsset] = useState<AssetRecord | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState('');
+  const [editIpAddress, setEditIpAddress] = useState('');
+  const [editMacAddress, setEditMacAddress] = useState('');
+  const [editOs, setEditOs] = useState('');
+  const [editStatus, setEditStatus] = useState('Online');
+  const [editVersion, setEditVersion] = useState('');
+  const [editConnection, setEditConnection] = useState('');
+  const [editLastSeen, setEditLastSeen] = useState('');
+  
+  const [editStep, setEditStep] = useState<'form' | 'ticket'>('form');
+  const [detectedChanges, setDetectedChanges] = useState<Record<string, { from: any, to: any }>>({});
+  const [ticketCriticality, setTicketCriticality] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'VERY HIGH'>('LOW');
+  const [ticketBu, setTicketBu] = useState<'itcorp' | 'plural' | 'mcd' | 'bit'>('itcorp');
+  const [ticketComments, setTicketComments] = useState('');
+  const [ticketAutomate, setTicketAutomate] = useState(true);
+  const [ticketSubmitting, setTicketSubmitting] = useState(false);
 
   // Formulário Manual Asset
   const [name, setName] = useState('');
@@ -520,6 +541,7 @@ export function AssetsPage({
                       )}
                     </div>
                   </th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -546,6 +568,27 @@ export function AssetsPage({
                       <td className="px-4 py-3 truncate max-w-[150px]" title={osText}>{osText}</td>
                       <td className="px-4 py-3 text-slate-400">
                         {asset.last_scanned_at ? new Date(asset.last_scanned_at).toLocaleString('pt-PT') : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 text-right space-x-2">
+                        <button
+                          onClick={() => {
+                            setEditAsset(asset);
+                            setEditName(asset.name || '');
+                            setEditType(asset.type || '');
+                            setEditIpAddress(asset.ip_address || '');
+                            setEditMacAddress(asset.mac_address || '');
+                            setEditOs(asset.os || '');
+                            setEditStatus(asset.status || 'Online');
+                            setEditVersion(asset.version || '');
+                            setEditConnection(asset.connection || '');
+                            setEditLastSeen(asset.last_seen || '');
+                            setEditStep('form');
+                            setShowEditModal(true);
+                          }}
+                          className="px-2.5 py-1 bg-blue-600/10 hover:bg-blue-600/30 text-blue-400 font-semibold rounded border border-blue-500/20 transition-all cursor-pointer text-[10px]"
+                        >
+                          Edit
+                        </button>
                       </td>
                     </tr>
                   );
@@ -762,6 +805,308 @@ export function AssetsPage({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Asset & Open Ticket */}
+      {showEditModal && editAsset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
+          <div className="relative bg-[#0d1321] border border-white/[0.08] text-slate-100 rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-slate-900 to-slate-800 border-b border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-blue-400" />
+                <h3 className="text-sm font-bold text-white">
+                  {editStep === 'form' ? `Edit Asset: ${editAsset.name}` : 'Confirm changes & Open Ticket'}
+                </h3>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {editStep === 'form' ? (
+              /* Step 1: Form */
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const changes: Record<string, { from: any, to: any }> = {};
+                const fields = {
+                  name: editName,
+                  type: editType,
+                  ip_address: editIpAddress,
+                  mac_address: editMacAddress,
+                  os: editOs,
+                  status: editStatus,
+                  version: editVersion,
+                  connection: editConnection,
+                  last_seen: editLastSeen
+                };
+                for (const [key, value] of Object.entries(fields)) {
+                  const originalVal = (editAsset as any)[key] || '';
+                  const newVal = value || '';
+                  if (String(originalVal).trim() !== String(newVal).trim()) {
+                    changes[key] = { from: originalVal, to: newVal };
+                  }
+                }
+                if (Object.keys(changes).length === 0) {
+                  toast.error('No changes detected. Modify at least one field.');
+                  return;
+                }
+                setDetectedChanges(changes);
+                setTicketCriticality('LOW');
+                setTicketBu('itcorp');
+                setTicketComments('');
+                setTicketAutomate(true);
+                setEditStep('ticket');
+              }} className="p-6 space-y-4 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Asset Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Type *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editType}
+                      onChange={(e) => setEditType(e.target.value)}
+                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Operating System</label>
+                    <input
+                      type="text"
+                      value={editOs}
+                      onChange={(e) => setEditOs(e.target.value)}
+                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">IP Address</label>
+                    <input
+                      type="text"
+                      value={editIpAddress}
+                      onChange={(e) => setEditIpAddress(e.target.value)}
+                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">MAC Address</label>
+                    <input
+                      type="text"
+                      value={editMacAddress}
+                      onChange={(e) => setEditMacAddress(e.target.value)}
+                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="w-full bg-[#0d1321] text-white border border-white/[0.08] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="Online">Online</option>
+                      <option value="Offline">Offline</option>
+                      <option value="Stale">Stale</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Agent Version</label>
+                    <input
+                      type="text"
+                      value={editVersion}
+                      onChange={(e) => setEditVersion(e.target.value)}
+                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Connection</label>
+                    <input
+                      type="text"
+                      value={editConnection}
+                      onChange={(e) => setEditConnection(e.target.value)}
+                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last Scan</label>
+                    <input
+                      type="text"
+                      value={editLastSeen}
+                      onChange={(e) => setEditLastSeen(e.target.value)}
+                      className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="flex-1 py-2.5 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] rounded-lg text-slate-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-semibold"
+                  >
+                    Review & Open Ticket
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Step 2: Pre-opening Ticket Confirmation */
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setTicketSubmitting(true);
+                try {
+                  const changeLines = Object.entries(detectedChanges).map(([key, diff]) => {
+                    return `- ${key.toUpperCase()}: "${diff.from || 'N/A'}" ➜ "${diff.to || 'N/A'}"`;
+                  });
+                  const formattedComment = [
+                    `Alterações de ativo detetadas automaticamente:`,
+                    ...changeLines,
+                    ticketComments ? `\nComentário do Utilizador:\n${ticketComments}` : ''
+                  ].filter(Boolean).join('\n');
+
+                  const assetChanges = Object.fromEntries(
+                    Object.entries(detectedChanges).map(([key, diff]) => [key, diff.to])
+                  );
+
+                  await createGLPITicket({
+                    actionType: 'UPDATE',
+                    hostName: editName.trim() || editAsset.name,
+                    os: editOs.trim() || editAsset.os || 'N/A',
+                    criticality: ticketCriticality,
+                    bu: ticketBu,
+                    comments: formattedComment,
+                    assetId: editAsset.id,
+                    automate: ticketAutomate,
+                    assetChanges
+                  }, token);
+
+                  toast.success('Update asset ticket opened successfully!');
+                  setShowEditModal(false);
+                  onRefresh();
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : 'Error opening update ticket.');
+                } finally {
+                  setTicketSubmitting(false);
+                }
+              }} className="p-6 space-y-4 text-xs">
+                {/* Lista de Alterações */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Detected Changes</label>
+                  <div className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg p-3 space-y-1.5 max-h-[140px] overflow-y-auto font-mono">
+                    {Object.entries(detectedChanges).map(([key, diff]) => (
+                      <div key={key} className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                        <span className="font-bold text-slate-400 uppercase">{key.replace('_', ' ')}:</span>
+                        <span className="text-red-400 line-through truncate max-w-[120px]">{String(diff.from || 'N/A')}</span>
+                        <span className="text-slate-600">➜</span>
+                        <span className="text-emerald-400 font-semibold truncate max-w-[120px]">{String(diff.to || 'N/A')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Ticket Criticality</label>
+                    <select
+                      value={ticketCriticality}
+                      onChange={(e) => setTicketCriticality(e.target.value as any)}
+                      className="w-full bg-[#0d1321] text-slate-300 border border-white/[0.08] rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="LOW">LOW</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="HIGH">HIGH</option>
+                      <option value="VERY HIGH">VERY HIGH</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Business Unit (BU)</label>
+                    <select
+                      value={ticketBu}
+                      onChange={(e) => setTicketBu(e.target.value as any)}
+                      className="w-full bg-[#0d1321] text-slate-300 border border-white/[0.08] rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="itcorp">itcorp</option>
+                      <option value="plural">plural</option>
+                      <option value="mcd">mcd (Media Capital)</option>
+                      <option value="bit">bit</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Comentários / Justificativa */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Comments / Justification</label>
+                  <textarea
+                    value={ticketComments}
+                    onChange={(e) => setTicketComments(e.target.value)}
+                    placeholder="Enter justification for this change request..."
+                    rows={2}
+                    className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none text-xs"
+                  />
+                </div>
+
+                {/* Checkbox de Automação */}
+                <label className="flex items-center gap-2.5 px-3 py-2.5 bg-blue-500/[0.03] border border-blue-500/20 rounded-lg cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ticketAutomate}
+                    onChange={(e) => setTicketAutomate(e.target.checked)}
+                    className="rounded border-white/[0.08] text-blue-600 focus:ring-blue-500 h-4 w-4 bg-transparent"
+                  />
+                  <div>
+                    <span className="font-semibold text-slate-200">Automate update upon resolution (Automação)</span>
+                    <p className="text-[9px] text-slate-500 leading-normal mt-0.5">
+                      If resolved/closed, the asset will be updated automatically in the inventory.
+                    </p>
+                  </div>
+                </label>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditStep('form')}
+                    className="flex-1 py-2.5 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] rounded-lg text-slate-300 transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={ticketSubmitting}
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold"
+                  >
+                    {ticketSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    <span>Confirm & Open Ticket</span>
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

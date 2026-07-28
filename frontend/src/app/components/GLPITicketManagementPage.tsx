@@ -28,11 +28,12 @@ interface GLPITicketManagementPageProps {
   token: string;
   onSubmitTicket: (
     ticket: {
-      actionType: 'ADD' | 'REMOVE';
+      actionType: 'ADD' | 'REMOVE' | 'UPDATE';
       hostName: string;
       os: string;
       criticality: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY HIGH';
       bu: 'itcorp' | 'plural' | 'mcd' | 'bit';
+      comments?: string;
     },
     file?: File | null
   ) => Promise<void>;
@@ -45,9 +46,10 @@ export default function GLPITicketManagementPage({
   onSubmitTicket
 }: GLPITicketManagementPageProps) {
   const [mode, setMode] = useState<'individual' | 'batch'>('individual');
-  const [actionType, setActionType] = useState<'ADD' | 'REMOVE'>('ADD');
+  const [actionType, setActionType] = useState<'ADD' | 'REMOVE' | 'UPDATE'>('ADD');
   const [hostName, setHostName] = useState('');
   const [os, setOs] = useState('');
+  const [comments, setComments] = useState('');
   const [criticality, setCriticality] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'VERY HIGH'>('LOW');
   const [bu, setBu] = useState<'itcorp' | 'plural' | 'mcd' | 'bit'>('itcorp');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -123,21 +125,25 @@ export default function GLPITicketManagementPage({
           hostName: hostName.trim(),
           os: os.trim(),
           criticality,
-          bu
+          bu,
+          comments: comments.trim() || undefined
         });
         // Limpar formulário
         setHostName('');
         setOs('');
+        setComments('');
       } else {
         await onSubmitTicket({
-          actionType,
+          actionType: actionType as 'ADD' | 'REMOVE',
           hostName: `Batch: ${selectedFile.name}`,
           os: 'See CSV attached',
           criticality,
-          bu
+          bu,
+          comments: comments.trim() || undefined
         }, selectedFile);
         // Limpar arquivo
         setSelectedFile(null);
+        setComments('');
       }
       setCriticality('LOW');
       setBu('itcorp');
@@ -244,6 +250,18 @@ export default function GLPITicketManagementPage({
                   onChange={(e) => setOs(e.target.value)}
                   placeholder="Ex: Ubuntu Server 22.04 LTS"
                   className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Comentários adicionais */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Comments / Justification</label>
+                <textarea
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  placeholder="Optional details or instructions..."
+                  rows={3}
+                  className="w-full bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none text-xs"
                 />
               </div>
             </>
@@ -418,14 +436,26 @@ export default function GLPITicketManagementPage({
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                           t.action_type === 'ADD'
                             ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                            : t.action_type === 'REMOVE'
+                            ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                            : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                         }`}>
-                          {t.action_type === 'ADD' ? 'Add' : 'Remove'}
+                          {t.action_type === 'ADD' ? 'Add' : t.action_type === 'REMOVE' ? 'Remove' : 'Update'}
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="font-semibold text-white">{t.host_name}</div>
                         <div className="text-[10px] text-slate-500 font-mono mt-0.5">{t.os}</div>
+                        {t.comments && (
+                          <div className="text-[10px] text-blue-400 mt-1 italic max-w-[200px] truncate" title={t.comments}>
+                            Obs: {t.comments}
+                          </div>
+                        )}
+                        {t.last_comment && (
+                          <div className="text-[10px] text-emerald-400 mt-1 italic max-w-[200px] truncate" title={t.last_comment}>
+                            GLPI: {t.last_comment}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold border ${

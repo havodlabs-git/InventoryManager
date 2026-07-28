@@ -7,7 +7,9 @@ const { Pool } = require("pg");
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
-  console.warn("[WARN] DATABASE_URL não definido.");
+  console.warn("[WARN] DATABASE_URL não definido. Utilizando banco de dados em memória (MOCK_DB).");
+  module.exports = require("./db_mock");
+  return;
 }
 
 const pool = new Pool({
@@ -222,6 +224,20 @@ async function initDb() {
     await client.query(`
       ALTER TABLE glpi_tickets ADD COLUMN IF NOT EXISTS glpi_ticket_id INTEGER NULL;
       ALTER TABLE glpi_tickets ADD COLUMN IF NOT EXISTS last_comment TEXT NULL;
+    `);
+
+    // Migração incremental para suportar comentários, edição e automação
+    await client.query(`
+      ALTER TABLE glpi_tickets ADD COLUMN IF NOT EXISTS comments TEXT NULL;
+      ALTER TABLE glpi_tickets ADD COLUMN IF NOT EXISTS asset_id UUID NULL REFERENCES assets(id) ON DELETE SET NULL;
+      ALTER TABLE glpi_tickets ADD COLUMN IF NOT EXISTS automate BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE glpi_tickets ADD COLUMN IF NOT EXISTS asset_changes JSONB NULL;
+    `);
+
+    // Atualizar check constraint de action_type para suportar 'UPDATE'
+    await client.query(`
+      ALTER TABLE glpi_tickets DROP CONSTRAINT IF EXISTS glpi_tickets_action_type_check;
+      ALTER TABLE glpi_tickets ADD CONSTRAINT glpi_tickets_action_type_check CHECK (action_type IN ('ADD', 'REMOVE', 'UPDATE'));
     `);
 
     // ─── Tabela de Configurações da API do GLPI por Customer ─────────────────

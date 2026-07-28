@@ -303,7 +303,28 @@ function requireUser({ customerIdResolver, minRole } = {}) {
 
   return async (req, res, next) => {
     if (isAdmin(req)) {
-      req.auth = { type: "admin", permissions: ALL_PERMISSIONS };
+      let customerId = null;
+      let userId = null;
+      const key = req.headers["x-admin-key"] || req.query.adminKey;
+      let token = getBearerToken(req);
+      if (!token && key && String(key).startsWith("ey")) {
+        token = key;
+      }
+      if (token) {
+        try {
+          const payload = verifyToken(token);
+          customerId = payload.customerId;
+          userId = payload.userId;
+        } catch {
+          // Ignorar
+        }
+      }
+      req.auth = { 
+        type: "admin", 
+        permissions: ALL_PERMISSIONS,
+        customerId,
+        userId
+      };
       return next();
     }
 
