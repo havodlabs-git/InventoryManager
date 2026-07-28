@@ -88,7 +88,8 @@ function issueApiToken(customerId, permissions, options = {}) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
-function issueUserToken(userId, customerId, role, sessionToken = null) {
+
+function issueUserToken(userId, customerId, role, sessionToken = null, permissions = null) {
   const rolePermissions = {
     admin:    ["asset:list", "asset:read", "asset:create", "asset:update", "asset:delete", "customer:info", "user:manage"],
     user:     ["asset:list", "asset:read", "asset:create", "asset:update", "asset:delete", "customer:info"],
@@ -101,7 +102,7 @@ function issueUserToken(userId, customerId, role, sessionToken = null) {
       customerId,
       role,
       scope: "user",
-      permissions: rolePermissions[role] || rolePermissions.user,
+      permissions: permissions || rolePermissions[role] || rolePermissions.user,
       sessionToken
     },
     JWT_SECRET,

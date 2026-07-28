@@ -63,6 +63,11 @@ async function initDb() {
         ON customers (keycloak_tenant) WHERE keycloak_tenant IS NOT NULL;
     `);
 
+    // ─── RBAC Custom rules for roles ──────────────────────────────────────────
+    await client.query(`
+      ALTER TABLE customers ADD COLUMN IF NOT EXISTS rbac_rules JSONB NULL;
+    `);
+
     // ─── Tabela de utilizadores (GUI only) ────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (

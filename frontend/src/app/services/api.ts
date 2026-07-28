@@ -84,8 +84,50 @@ export async function getCustomerMe(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Assets Inventory
+export interface UserRecord {
+  userId: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
+
+export async function listUsers(token: string): Promise<{ customerId: string; total: number; data: UserRecord[] }> {
+  return request<{ customerId: string; total: number; data: UserRecord[] }>('GET', '/api/customer/users', undefined, token);
+}
+
+export async function createUser(
+  user: { email: string; password?: string; role: string },
+  token: string
+): Promise<UserRecord> {
+  return request<UserRecord>('POST', '/api/customer/users', user, token);
+}
+
+export async function updateUserRole(
+  userId: string,
+  role: string,
+  token: string
+): Promise<UserRecord> {
+  return request<UserRecord>('PUT', `/api/customer/users/${userId}/role`, { role }, token);
+}
+
+export async function deleteUser(
+  userId: string,
+  token: string
+): Promise<{ success: boolean; userId: string; email: string }> {
+  return request<{ success: boolean; userId: string; email: string }>('DELETE', `/api/customer/users/${userId}`, undefined, token);
+}
+
+export async function getRBACRules(token: string): Promise<{ rbacRules: Record<string, string[]> }> {
+  return request<{ rbacRules: Record<string, string[]> }>('GET', '/api/customer/rbac', undefined, token);
+}
+
+export async function updateRBACRules(
+  rbacRules: Record<string, string[]>,
+  token: string
+): Promise<{ success: boolean; rbacRules: Record<string, string[]> }> {
+  return request<{ success: boolean; rbacRules: Record<string, string[]> }>('PUT', '/api/customer/rbac', { rbacRules }, token);
+}
+
 // ---------------------------------------------------------------------------
 
 export interface AssetRecord {

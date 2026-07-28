@@ -81,6 +81,25 @@ function saveAuth(data: AuthData | null) {
   } catch { /* ignore */ }
 }
 
+const getAllowedPages = (token?: string): PageId[] => {
+  if (!token) return ['dashboard'];
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.scope === 'master') {
+      return ['dashboard', 'inventory', 'glpi_tickets', 'removal_requests'];
+    }
+    const perms = payload.permissions || [];
+    const pages: PageId[] = [];
+    if (perms.includes('customer:info')) pages.push('dashboard');
+    if (perms.includes('asset:list')) pages.push('inventory');
+    if (perms.includes('asset:create')) pages.push('glpi_tickets');
+    if (perms.includes('asset:delete')) pages.push('removal_requests');
+    return pages;
+  } catch {
+    return ['dashboard'];
+  }
+};
+
 export default function App() {
   // Admin Mode
   const [adminKey, setAdminKey] = useState<string | null>(loadAdminSession);
@@ -92,7 +111,18 @@ export default function App() {
   const [auth, setAuth] = useState<AuthData | null>(loadAuth);
   // SSO Portal CWO: desativado por agora (sempre false)
   const [ssoChecking, setSsoChecking] = useState<boolean>(false);
+  
+  const allowedPages = getAllowedPages(auth?.token);
   const [activePage, setActivePage] = useState<PageId>('dashboard');
+
+  useEffect(() => {
+    if (auth && !allowedPages.includes(activePage)) {
+      if (allowedPages.length > 0) {
+        setActivePage(allowedPages[0]);
+      }
+    }
+  }, [auth, allowedPages, activePage]);
+
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
   

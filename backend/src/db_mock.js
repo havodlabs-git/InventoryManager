@@ -126,13 +126,52 @@ class MockClient {
       const row = db.customers.find(c => c.id === id);
       return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
     }
-
     // 5. SELECT * FROM users WHERE customer_id = $1 AND email = $2
-    if (cleanSql.includes('FROM users WHERE customer_id =')) {
+    if (cleanSql.includes('FROM users WHERE customer_id =') && cleanSql.includes('email =')) {
       const cid = params[0];
       const email = params[1];
       const row = db.users.find(u => u.customer_id === cid && u.email === email);
       return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+    }
+
+    // 5a. INSERT INTO users
+    if (cleanSql.startsWith('INSERT INTO users')) {
+      const [id, customer_id, email, password_hash, role] = params;
+      if (db.users.some(u => u.customer_id === customer_id && u.email === email)) {
+        throw new Error("USER_ALREADY_EXISTS");
+      }
+      const row = { id, customer_id, email, password_hash, role, created_at: new Date() };
+      db.users.push(row);
+      return { rows: [row], rowCount: 1 };
+    }
+
+    // 5b. SELECT id, email, role, created_at FROM users WHERE customer_id = $1
+    if (cleanSql.includes('SELECT id, email, role, created_at FROM users WHERE customer_id =')) {
+      const cid = params[0];
+      const rows = db.users.filter(u => u.customer_id === cid);
+      return { rows, rowCount: rows.length };
+    }
+
+    // 5c. UPDATE users SET role = $1 WHERE id = $2 AND customer_id = $3
+    if (cleanSql.includes('UPDATE users SET role =')) {
+      const [role, id, customer_id] = params;
+      const row = db.users.find(u => u.id === id && u.customer_id === customer_id);
+      if (row) {
+        row.role = role;
+      }
+      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+    }
+
+    // 5d. DELETE FROM users WHERE id = $1 AND customer_id = $2
+    if (cleanSql.includes('DELETE FROM users WHERE id =')) {
+      const [id, customer_id] = params;
+      const index = db.users.findIndex(u => u.id === id && u.customer_id === customer_id);
+      let deleted = null;
+      if (index !== -1) {
+        deleted = db.users[index];
+        db.users.splice(index, 1);
+      }
+      return { rows: deleted ? [deleted] : [], rowCount: deleted ? 1 : 0 };
     }
 
     // 6. SELECT * FROM customers WHERE keycloak_tenant = $1
@@ -184,6 +223,16 @@ class MockClient {
       const row = db.customers.find(c => c.id === id);
       if (row) row.session_token = token;
       return { rows: [row], rowCount: row ? 1 : 0 };
+    }
+
+    // 12a. UPDATE customers SET rbac_rules = $1 WHERE id = $2
+    if (cleanSql.includes('UPDATE customers SET rbac_rules =')) {
+      const [rules, id] = params;
+      const row = db.customers.find(c => c.id === id);
+      if (row) {
+        row.rbac_rules = typeof rules === 'string' ? JSON.parse(rules) : rules;
+      }
+      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
     }
 
     // 12b. UPDATE users SET session_token = $1 WHERE id = $2

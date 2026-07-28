@@ -62,6 +62,26 @@ export function Layout({ auth, onLogout, activePage, onNavigate, children, setti
   const userSettings = externalSettings ?? localSettings;
   const displayName = userSettings.displayName || auth.customerName;
 
+  const allowedPages = auth.token ? (() => {
+    try {
+      const payload = JSON.parse(atob(auth.token.split('.')[1]));
+      if (payload.scope === 'master') {
+        return ['dashboard', 'inventory', 'glpi_tickets', 'removal_requests'];
+      }
+      const perms = payload.permissions || [];
+      const pages: PageId[] = [];
+      if (perms.includes('customer:info')) pages.push('dashboard');
+      if (perms.includes('asset:list')) pages.push('inventory');
+      if (perms.includes('asset:create')) pages.push('glpi_tickets');
+      if (perms.includes('asset:delete')) pages.push('removal_requests');
+      return pages;
+    } catch {
+      return ['dashboard'];
+    }
+  })() : ['dashboard'];
+
+  const allowedNavItems = NAV_ITEMS.filter((item) => allowedPages.includes(item.id));
+
   const initials = displayName
     .split(' ')
     .map((w) => w[0])
@@ -127,7 +147,7 @@ export function Layout({ auth, onLogout, activePage, onNavigate, children, setti
 
         {/* Nav items */}
         <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
+          {allowedNavItems.map((item) => {
             const active = activePage === item.id;
             return (
               <button

@@ -26,6 +26,49 @@ const {
 
 const router = express.Router();
 
+async function resolveUserPermissions(customerId, role) {
+  const defaultRolePermissions = {
+    admin:    ["asset:list", "asset:read", "asset:create", "asset:update", "asset:delete", "customer:info", "user:manage"],
+    user:     ["asset:list", "asset:read", "asset:create", "asset:update", "asset:delete", "customer:info"],
+    readonly: ["asset:list", "asset:read", "customer:info"]
+  };
+
+  try {
+    const custRes = await pool.query(
+      "SELECT rbac_rules FROM customers WHERE id = $1",
+      [customerId]
+    );
+    if (custRes.rowCount === 0) return defaultRolePermissions[role] || defaultRolePermissions.user;
+    
+    const rbacRules = custRes.rows[0].rbac_rules;
+    if (!rbacRules || !rbacRules[role]) {
+      return defaultRolePermissions[role] || defaultRolePermissions.user;
+    }
+
+    const allowedPages = rbacRules[role];
+    const perms = [];
+    if (allowedPages.includes("dashboard")) {
+      perms.push("customer:info");
+    }
+    if (allowedPages.includes("inventory")) {
+      perms.push("asset:list", "asset:read", "asset:update");
+    }
+    if (allowedPages.includes("glpi_tickets")) {
+      perms.push("asset:create", "asset:update");
+    }
+    if (allowedPages.includes("removal_requests")) {
+      perms.push("asset:delete");
+    }
+    if (role === "admin") {
+      perms.push("user:manage", "apikey:manage");
+    }
+    return Array.from(new Set(perms));
+  } catch (err) {
+    console.error("[resolveUserPermissions] Erro:", err);
+    return defaultRolePermissions[role] || defaultRolePermissions.user;
+  }
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -116,11 +159,11 @@ router.post("/token/create", async (req, res) => {
       const user = userRes.rows[0];
       const ok = await bcrypt.compare(String(customerSecret), user.password_hash);
       if (!ok) return res.status(401).json({ error: "INVALID_CREDENTIALS" });
-
       const sessionToken = uuidv4();
       await pool.query("UPDATE users SET session_token = $1 WHERE id = $2", [sessionToken, user.id]);
 
-      const token = issueUserToken(user.id, user.customer_id, user.role, sessionToken);
+      const resolvedPerms = await resolveUserPermissions(user.customer_id, user.role);
+      const token = issueUserToken(user.id, user.customer_id, user.role, sessionToken, resolvedPerms);
 
       return res.status(200).json({
         token,
@@ -356,11 +399,11 @@ router.post("/user/login", async (req, res) => {
     const user = userRes.rows[0];
     const ok   = await bcrypt.compare(String(password), user.password_hash);
     if (!ok) return res.status(401).json({ error: "INVALID_CREDENTIALS" });
-
     const sessionToken = uuidv4();
     await pool.query("UPDATE users SET session_token = $1 WHERE id = $2", [sessionToken, user.id]);
 
-    const token = issueUserToken(user.id, customerId, user.role, sessionToken);
+    const resolvedPerms = await resolveUserPermissions(customerId, user.role);
+    const token = issueUserToken(user.id, customerId, user.role, sessionToken, resolvedPerms);
 
     return res.status(200).json({
       token,
@@ -385,18 +428,25 @@ router.get(
       const { customerId, userId, role, type, permissions } = req.auth;
 
       const r = await pool.query(
-        "SELECT id, name, created_at FROM customers WHERE id = $1",
+        "SELECT id, name, rbac_rules, created_at FROM customers WHERE id = $1",
         [customerId]
       );
       if (r.rowCount === 0) return res.status(404).json({ error: "CUSTOMER_NOT_FOUND" });
 
       const c = r.rows[0];
+      const defaultRules = {
+        admin: ["dashboard", "inventory", "glpi_tickets", "removal_requests"],
+        user: ["dashboard", "inventory"],
+        readonly: ["dashboard"]
+      };
+
       const response = {
         customerId: c.id,
         name: c.name,
         createdAt: c.created_at,
         authType: type,
-        permissions: permissions || []
+        permissions: permissions || [],
+        rbacRules: c.rbac_rules || defaultRules
       };
 
       if (type === "user" && userId) {
@@ -730,5 +780,131 @@ router.post("/secret/rotate", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
+
+// ─── Management of Users by Master Admin ─────────────────────────────────────
+router.post(
+  "/users",
+  requireMasterOnly(),
+  async (req, res) => {
+    try {
+      const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+      if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
+
+      const { email, password, role } = req.body || {};
+      const normEmail = normalizeEmail(email);
+      if (!normEmail || !normEmail.includes("@")) {
+        return res.status(400).json({ error: "INVALID_EMAIL" });
+      }
+      if (!password || String(password).length < 8) {
+        return res.status(400).json({ error: "WEAK_PASSWORD_MIN_8" });
+      }
+
+      const validRoles = ["admin", "user", "readonly"];
+      const assignedRole = role && validRoles.includes(role) ? role : "user";
+
+      const rounds       = Number(process.env.BCRYPT_ROUNDS || 12);
+      const passwordHash = await bcrypt.hash(String(password), rounds);
+      const userId       = uuidv4();
+
+      try {
+        await pool.query(
+          `INSERT INTO users (id, customer_id, email, password_hash, role, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())`,
+          [userId, customerId, normEmail, passwordHash, assignedRole]
+        );
+      } catch (err) {
+        if (err && err.code === "23505") {
+          return res.status(409).json({ error: "USER_ALREADY_EXISTS" });
+        }
+        if (err && err.message === "USER_ALREADY_EXISTS") {
+          return res.status(409).json({ error: "USER_ALREADY_EXISTS" });
+        }
+        throw err;
+      }
+
+      return res.status(201).json({
+        userId,
+        customerId,
+        email: normEmail,
+        role: assignedRole,
+        createdAt: nowIso()
+      });
+    } catch (err) {
+      console.error("[POST /users]", err);
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  }
+);
+
+// ─── RBAC Configuration ───────────────────────────────────────────────────────
+router.get(
+  "/rbac",
+  requireUser(),
+  async (req, res) => {
+    try {
+      const { customerId } = req.auth;
+      const r = await pool.query(
+        "SELECT rbac_rules FROM customers WHERE id = $1",
+        [customerId]
+      );
+      if (r.rowCount === 0) return res.status(404).json({ error: "CUSTOMER_NOT_FOUND" });
+
+      const defaultRules = {
+        admin: ["dashboard", "inventory", "glpi_tickets", "removal_requests"],
+        user: ["dashboard", "inventory"],
+        readonly: ["dashboard"]
+      };
+
+      return res.status(200).json({
+        rbacRules: r.rows[0].rbac_rules || defaultRules
+      });
+    } catch (err) {
+      console.error("[GET /rbac]", err);
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  }
+);
+
+router.put(
+  "/rbac",
+  requireMasterOnly(),
+  async (req, res) => {
+    try {
+      const customerId = req.auth.type === "admin" ? req.body.customerId : req.auth.customerId;
+      if (!customerId) return res.status(400).json({ error: "CUSTOMER_ID_REQUIRED" });
+
+      const { rbacRules } = req.body || {};
+      if (!rbacRules || typeof rbacRules !== "object") {
+        return res.status(400).json({ error: "INVALID_RBAC_RULES" });
+      }
+
+      const validRoles = ["admin", "user", "readonly"];
+      const validPages = ["dashboard", "inventory", "glpi_tickets", "removal_requests"];
+
+      for (const [role, pages] of Object.entries(rbacRules)) {
+        if (!validRoles.includes(role)) {
+          return res.status(400).json({ error: `INVALID_ROLE: ${role}` });
+        }
+        if (!Array.isArray(pages)) {
+          return res.status(400).json({ error: `PAGES_MUST_BE_ARRAY_FOR_ROLE: ${role}` });
+        }
+        const invalidPage = pages.find(p => !validPages.includes(p));
+        if (invalidPage) {
+          return res.status(400).json({ error: `INVALID_PAGE: ${invalidPage} for role ${role}` });
+        }
+      }
+
+      await pool.query(
+        "UPDATE customers SET rbac_rules = $1 WHERE id = $2",
+        [JSON.stringify(rbacRules), customerId]
+      );
+
+      return res.status(200).json({ success: true, rbacRules });
+    } catch (err) {
+      console.error("[PUT /rbac]", err);
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  }
+);
 
 module.exports = router;
