@@ -55,7 +55,6 @@ services:
       - ADMIN_API_KEY=${ADMIN_API_KEY:-minha-chave-felipe}
       - MFA_APP_NAME=${MFA_APP_NAME:-"CWO Inventory Manager"}
       - BCRYPT_ROUNDS=${BCRYPT_ROUNDS:-12}
-      - CORS_ORIGINS=https://inventory.cwo.com.pt:4016,https://172.16.2.10:4546,https://inventory.cwo.com.pt
     depends_on:
       db:
         condition: service_healthy
