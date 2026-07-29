@@ -510,6 +510,51 @@ export async function adminRotateCustomerSecret(
   );
 }
 
+export async function adminGetGLPIConfig(
+  customerId: string,
+  adminKey: string
+): Promise<{ data: GLPIConfigRecord }> {
+  return request<{ data: GLPIConfigRecord }>(
+    'GET',
+    `/api/assets/glpi-config?customerId=${customerId}`,
+    undefined,
+    undefined,
+    adminKey
+  );
+}
+
+export async function adminUpdateGLPIConfig(
+  customerId: string,
+  config: {
+    glpiUrl: string;
+    appToken: string;
+    userToken: string;
+    enabled: boolean;
+  },
+  adminKey: string
+): Promise<{ success: boolean; data: GLPIConfigRecord }> {
+  return request<{ success: boolean; data: GLPIConfigRecord }>(
+    'PUT',
+    '/api/assets/glpi-config',
+    { ...config, customerId },
+    undefined,
+    adminKey
+  );
+}
+
+export async function adminTestGLPIConnection(
+  customerId: string,
+  adminKey: string
+): Promise<{ success: boolean; message: string }> {
+  return request<{ success: boolean; message: string }>(
+    'POST',
+    '/api/assets/glpi-config/test',
+    { customerId },
+    undefined,
+    adminKey
+  );
+}
+
 // ---------------------------------------------------------------------------
 // GLPI Tickets Integration
 // ---------------------------------------------------------------------------

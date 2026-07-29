@@ -40,9 +40,9 @@ import {
   adminActionRemovalRequest,
   adminListGLPITickets,
   adminUpdateGLPITicketStatus,
-  getGLPIConfig,
-  updateGLPIConfig,
-  testGLPIConnection
+  adminGetGLPIConfig,
+  adminUpdateGLPIConfig,
+  adminTestGLPIConnection
 } from '@/app/services/api';
 import type { AdminCustomerInfo, AssetRecord, Rapid7Config } from '@/app/services/api';
 import { Toaster, toast } from 'sonner';
@@ -184,7 +184,7 @@ export function AdminPanel({ adminKey, onLogout }: AdminPanelProps) {
 
         // Fetch GLPI Config
         try {
-          const glpiRes = await getGLPIConfig(adminKey, customerId);
+          const glpiRes = await adminGetGLPIConfig(customerId, adminKey);
           const gc = glpiRes.data;
           setGlpiUrl(gc.glpi_url || '');
           setGlpiAppToken(gc.app_token || '');
@@ -341,12 +341,11 @@ export function AdminPanel({ adminKey, onLogout }: AdminPanelProps) {
       }, adminKey);
 
       // Save GLPI Config
-      await updateGLPIConfig({
+      await adminUpdateGLPIConfig(selectedCustomerId, {
         glpiUrl: glpiUrl.trim(),
         appToken: glpiAppToken.trim(),
         userToken: glpiUserToken.trim(),
-        enabled: glpiEnabled,
-        customerId: selectedCustomerId
+        enabled: glpiEnabled
       }, adminKey);
 
       toast.success('Configuration saved successfully!');
@@ -378,7 +377,7 @@ export function AdminPanel({ adminKey, onLogout }: AdminPanelProps) {
     if (!selectedCustomerId) return;
     setTestingGLPI(true);
     try {
-      await testGLPIConnection(adminKey, selectedCustomerId);
+      await adminTestGLPIConnection(selectedCustomerId, adminKey);
       toast.success('Connection to ticketing system established successfully!');
     } catch (err: any) {
       const msg = err?.message === 'GLPI_NOT_CONFIGURED'
