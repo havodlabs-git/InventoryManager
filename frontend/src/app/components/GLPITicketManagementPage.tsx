@@ -173,9 +173,9 @@ export default function GLPITicketManagementPage({
         }
       `}</style>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Colunas 1, 2, 3: Formulário de Abertura de Ticket (GLPI) */}
-        <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-6 h-fit space-y-5 lg:col-span-3">
+      <div className="max-w-3xl mx-auto">
+        {/* Formulário de Abertura de Ticket (GLPI) */}
+        <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-6 h-fit space-y-5">
           <div>
             <h2 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
               <FileText className="w-4 h-4 text-blue-500" />
@@ -409,117 +409,6 @@ export default function GLPITicketManagementPage({
               </p>
             )}
           </form>
-        </div>
-
-        {/* Colunas 4 e 5: Histórico de Tickets Abertos */}
-        <div className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-6 space-y-4 lg:col-span-2 flex flex-col h-[525px]">
-          <div>
-            <h2 className="text-sm font-bold text-white tracking-wide flex items-center justify-between">
-              <span>Ticket History</span>
-              <Clock className="w-4 h-4 text-slate-500" />
-            </h2>
-            <p className="text-[11px] text-slate-500 mt-1">Track the triage and validation status of tickets.</p>
-          </div>
-
-          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-3">
-            {loading ? (
-              <div className="h-full flex flex-col items-center justify-center gap-3">
-                <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-                <p className="text-slate-500">Loading history...</p>
-              </div>
-            ) : tickets.length > 0 ? (
-              <div className="space-y-3">
-                {tickets.map((t) => {
-                  const dateStr = new Date(t.created_at).toLocaleString('pt-PT', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  });
-                  return (
-                    <div 
-                      key={t.id} 
-                      className="bg-white/[0.01] border border-white/[0.06] hover:border-white/[0.12] rounded-xl p-4 space-y-3 transition-all hover:bg-white/[0.02]"
-                    >
-                      {/* Header: Ticket Number & Status */}
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-white text-[11px] select-all bg-white/[0.03] px-2 py-0.5 rounded border border-white/[0.05]">
-                          #{t.ticket_number}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
-                          t.status === 'OPEN'
-                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            : t.status === 'PROCESSING'
-                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        }`}>
-                          {t.status === 'OPEN' ? 'Open' : t.status === 'PROCESSING' ? 'Processing' : 'Resolved'}
-                        </span>
-                      </div>
-
-                      {/* Metadata Row: Action, Criticality, BU, Date */}
-                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-slate-400 border-t border-b border-white/[0.04] py-2">
-                        <span className={`px-1.5 py-0.5 rounded font-bold border ${
-                          t.action_type === 'ADD'
-                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            : t.action_type === 'REMOVE'
-                            ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-                            : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                        }`}>
-                          {t.action_type === 'ADD' ? 'Add' : t.action_type === 'REMOVE' ? 'Remove' : 'Update'}
-                        </span>
-                        
-                        <span className={`px-1.5 py-0.5 rounded font-extrabold border ${
-                          t.criticality === 'VERY HIGH'
-                            ? 'bg-red-600/10 text-red-500 border-red-500/30'
-                            : t.criticality === 'HIGH'
-                            ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
-                            : t.criticality === 'MEDIUM'
-                            ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
-                            : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
-                        }`}>
-                          {t.criticality}
-                        </span>
-
-                        <span className="uppercase font-semibold text-slate-500 flex items-center gap-0.5 bg-white/[0.02] px-1.5 py-0.5 rounded border border-white/[0.04]">
-                          <Building className="w-3 h-3 text-slate-600" />
-                          <span>{t.bu}</span>
-                        </span>
-                        
-                        <span className="text-[9px] text-slate-500 font-mono ml-auto">{dateStr}</span>
-                      </div>
-
-                      {/* Host details */}
-                      <div className="space-y-0.5">
-                        <div className="font-semibold text-white text-xs">{t.host_name}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{t.os}</div>
-                      </div>
-
-                      {/* Comments */}
-                      {t.comments && (
-                        <div className="text-[10px] bg-blue-500/5 border border-blue-500/10 rounded p-2 text-blue-300/90 italic">
-                          <span className="font-bold not-italic block text-[9px] text-blue-400/80 mb-0.5">Observation:</span>
-                          {t.comments}
-                        </div>
-                      )}
-                      {t.last_comment && (
-                        <div className="text-[10px] bg-emerald-500/5 border border-emerald-500/10 rounded p-2 text-emerald-300/90 italic">
-                          <span className="font-bold not-italic block text-[9px] text-emerald-400/80 mb-0.5">GLPI Resolution:</span>
-                          {t.last_comment}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-500 py-12">
-                <FolderOpen className="w-10 h-10 text-white/[0.05]" />
-                <p className="text-xs">No tickets opened recently.</p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

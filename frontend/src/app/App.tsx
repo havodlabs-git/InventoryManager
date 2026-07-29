@@ -6,6 +6,7 @@ import { AssetsPage } from '@/app/components/AssetsPage';
 import { AdminPanel } from '@/app/components/AdminPanel';
 import RemovalRequestsPage from '@/app/components/RemovalRequestsPage';
 import GLPITicketManagementPage from '@/app/components/GLPITicketManagementPage';
+import GLPITicketsHistoryPage from '@/app/components/GLPITicketsHistoryPage';
 import { listAssets, getRapid7Config, triggerRapid7Sync, listGLPITickets, createGLPITicket, createGLPIBatchTicket } from '@/app/services/api';
 import type { AssetRecord, AuthData, GLPITicketRecord } from '@/app/services/api';
 import type { PageId } from '@/app/components/Layout';
@@ -86,13 +87,16 @@ const getAllowedPages = (token?: string): PageId[] => {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.scope === 'master') {
-      return ['dashboard', 'inventory', 'glpi_tickets', 'removal_requests'];
+      return ['dashboard', 'inventory', 'glpi_tickets', 'glpi_history', 'removal_requests'];
     }
     const perms = payload.permissions || [];
     const pages: PageId[] = [];
     if (perms.includes('customer:info')) pages.push('dashboard');
     if (perms.includes('asset:list')) pages.push('inventory');
-    if (perms.includes('asset:create')) pages.push('glpi_tickets');
+    if (perms.includes('asset:create')) {
+      pages.push('glpi_tickets');
+      pages.push('glpi_history');
+    }
     if (perms.includes('asset:delete')) pages.push('removal_requests');
     return pages;
   } catch {
@@ -409,6 +413,13 @@ export default function App() {
           loading={loadingTickets}
           token={auth.token}
           onSubmitTicket={handleSubmitTicket}
+        />
+      )}
+
+      {activePage === 'glpi_history' && (
+        <GLPITicketsHistoryPage
+          tickets={tickets}
+          loading={loadingTickets}
         />
       )}
     </Layout>

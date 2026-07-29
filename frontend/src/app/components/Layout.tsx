@@ -13,14 +13,15 @@ import {
   Database,
   ClipboardList,
   Shield,
-  FileText
+  FileText,
+  History
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import type { AuthData } from './AuthForm';
 import { UserSettingsModal, DEFAULT_SETTINGS } from './UserSettingsModal';
 import type { UserSettings } from './UserSettingsModal';
 
-export type PageId = 'dashboard' | 'inventory' | 'import' | 'integration' | 'removal_requests' | 'vulnerability_management' | 'glpi_tickets';
+export type PageId = 'dashboard' | 'inventory' | 'import' | 'integration' | 'removal_requests' | 'vulnerability_management' | 'glpi_tickets' | 'glpi_history';
 
 interface NavItem {
   id: PageId;
@@ -32,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard',                label: 'Dashboard',                       icon: <LayoutDashboard className="w-5 h-5" /> },
   { id: 'inventory',                label: 'Asset Inventory',                  icon: <List className="w-5 h-5" /> },
   { id: 'glpi_tickets',             label: 'Open Ticket',                     icon: <FileText className="w-5 h-5" /> },
+  { id: 'glpi_history',             label: 'Ticket History',                  icon: <History className="w-5 h-5" /> },
   { id: 'removal_requests',         label: 'Requests',                         icon: <ClipboardList className="w-5 h-5" /> },
 ];
 
@@ -66,13 +68,16 @@ export function Layout({ auth, onLogout, activePage, onNavigate, children, setti
     try {
       const payload = JSON.parse(atob(auth.token.split('.')[1]));
       if (payload.scope === 'master') {
-        return ['dashboard', 'inventory', 'glpi_tickets', 'removal_requests'];
+        return ['dashboard', 'inventory', 'glpi_tickets', 'glpi_history', 'removal_requests'];
       }
       const perms = payload.permissions || [];
       const pages: PageId[] = [];
       if (perms.includes('customer:info')) pages.push('dashboard');
       if (perms.includes('asset:list')) pages.push('inventory');
-      if (perms.includes('asset:create')) pages.push('glpi_tickets');
+      if (perms.includes('asset:create')) {
+        pages.push('glpi_tickets');
+        pages.push('glpi_history');
+      }
       if (perms.includes('asset:delete')) pages.push('removal_requests');
       return pages;
     } catch {
