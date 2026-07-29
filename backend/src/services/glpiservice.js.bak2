@@ -251,8 +251,8 @@ async function linkDocumentToTicket(config, sessionToken, ticketId, documentId) 
  */
 async function findEntityIdByPath(config, sessionToken) {
   const baseUrl = normalizeGlpiUrl(config.glpi_url);
-  const targetPath = "CWO > CLIENTES > MEDIA CAPITAL GROUP";
-  const targetName = "MEDIA CAPITAL GROUP";
+  const targetPath = "CWO > INTERNO > PURPLETEAM";
+  const targetName = "PURPLETEAM";
 
   const headers = {
     "Content-Type": "application/json",
@@ -359,7 +359,6 @@ async function createTicket(config, { actionType, hostName, os, criticality, bu,
     const entityId = await findEntityIdByPath(config, sessionToken);
 
     const ticketInput = {
-    _groups_id_assign: 6,
       name,
       content,
       urgency: URGENCY_MAP[criticality] || 3,
