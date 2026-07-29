@@ -61,13 +61,43 @@ async function glpiFetch(url, options = {}) {
   }
 }
 
-/** Carrega a configuração GLPI do tenant. Retorna null se não existir. */
+const { v4: uuidv4 } = require("uuid");
+
+/** Carrega a configuração GLPI do tenant. Inicializa com os dados padrões de produção CWO se não existir ou se estiver vazia. */
 async function getGlpiConfig(customerId) {
   const r = await pool.query(
     "SELECT * FROM glpi_configs WHERE customer_id = $1",
     [customerId]
   );
-  return r.rowCount > 0 ? r.rows[0] : null;
+  
+  if (r.rowCount === 0) {
+    const insertRes = await pool.query(
+      `INSERT INTO glpi_configs (id, customer_id, glpi_url, app_token, user_token, enabled, updated_at)
+       VALUES ($1, $2, $3, NULL, $4, TRUE, NOW())
+       RETURNING *`,
+      [
+        uuidv4(),
+        customerId,
+        'https://itsm.cwo.com.pt/',
+        '6oyp1BXUORAmPUuBYAsdOhs6672OvxDytFkxMTth'
+      ]
+    );
+    return insertRes.rows[0];
+  }
+  
+  const config = r.rows[0];
+  if (!config.glpi_url) {
+    const updateRes = await pool.query(
+      `UPDATE glpi_configs 
+       SET glpi_url = $1, user_token = $2, enabled = TRUE, updated_at = NOW()
+       WHERE customer_id = $3
+       RETURNING *`,
+      ['https://itsm.cwo.com.pt/', '6oyp1BXUORAmPUuBYAsdOhs6672OvxDytFkxMTth', customerId]
+    );
+    return updateRes.rows[0];
+  }
+  
+  return config;
 }
 
 /** Verifica se a configuração tem as credenciais mínimas preenchidas */
