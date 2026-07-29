@@ -217,6 +217,67 @@ async function linkDocumentToTicket(config, sessionToken, ticketId, documentId) 
 }
 
 /**
+ * Procura o ID da entidade pelo caminho completo ou nome.
+ */
+async function findEntityIdByPath(config, sessionToken) {
+  const baseUrl = normalizeGlpiUrl(config.glpi_url);
+  const targetPath = "CWO.GERAL > CWO - DIREÇÃO GERAL > CTS – CONSULTING AND TECHNICAL SERVICES > PURPLETEAM > Gestão de vulnerabilidades";
+  const targetName = "Gestão de vulnerabilidades";
+
+  const headers = {
+    "Content-Type": "application/json",
+    "Session-Token": sessionToken
+  };
+  if (config.app_token) {
+    headers["App-Token"] = config.app_token;
+  }
+
+  try {
+    const res = await glpiFetch(`${baseUrl}/apirest.php/Entity?range=0-1000`, {
+      method: "GET",
+      headers
+    });
+
+    if (!res.ok) {
+      console.warn(`[GLPI Entity Lookup] Failed to fetch entities: HTTP ${res.status}`);
+      return null;
+    }
+
+    const entities = await res.json().catch(() => []);
+    if (!Array.isArray(entities)) {
+      return null;
+    }
+
+    const normalizePath = (p) => String(p || "").replace(/\s*>\s*/g, ">").trim().toLowerCase();
+    const targetNorm = normalizePath(targetPath);
+
+    let match = entities.find(e => normalizePath(e.completename) === targetNorm);
+    if (match) {
+      console.log(`[GLPI Entity Lookup] Found exact path match: ID ${match.id} (${match.completename})`);
+      return match.id;
+    }
+
+    match = entities.find(e => String(e.name || "").trim().toLowerCase() === targetName.toLowerCase());
+    if (match) {
+      console.log(`[GLPI Entity Lookup] Found name match: ID ${match.id} (${match.completename})`);
+      return match.id;
+    }
+
+    match = entities.find(e => normalizePath(e.completename).includes(targetName.toLowerCase()));
+    if (match) {
+      console.log(`[GLPI Entity Lookup] Found partial match: ID ${match.id} (${match.completename})`);
+      return match.id;
+    }
+
+    console.warn(`[GLPI Entity Lookup] Entity "${targetName}" not found in GLPI.`);
+    return null;
+  } catch (err) {
+    console.error("[GLPI Entity Lookup] Error:", err);
+    return null;
+  }
+}
+
+/**
  * Cria um ticket real no GLPI.
  * @returns {{ glpiId: number, ticketNumber: string }}
  */
@@ -265,16 +326,24 @@ async function createTicket(config, { actionType, hostName, os, criticality, bu,
       headers["App-Token"] = config.app_token;
     }
 
+    const entityId = await findEntityIdByPath(config, sessionToken);
+
+    const ticketInput = {
+      name,
+      content,
+      urgency: URGENCY_MAP[criticality] || 3,
+      type: 2 // 2 = Requisição (Request)
+    };
+
+    if (entityId !== null) {
+      ticketInput.entities_id = Number(entityId);
+    }
+
     const res = await glpiFetch(`${baseUrl}/apirest.php/Ticket`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        input: {
-          name,
-          content,
-          urgency: URGENCY_MAP[criticality] || 3,
-          type: 2 // 2 = Requisição (Request)
-        }
+        input: ticketInput
       })
     });
 
