@@ -11,11 +11,7 @@ import {
   EyeOff,
   Activity,
   Globe,
-  Server,
-  ShieldCheck,
-  ChevronRight,
-  Database,
-  Grid
+  ChevronRight
 } from 'lucide-react';
 import logo from '@/assets/logo-dark.png';
 import { getCustomerToken, getCustomerMe, getMfaStatus, validateMfaLogin, registerCustomer } from '@/app/services/api';
@@ -106,29 +102,7 @@ function FloatingParticles() {
   );
 }
 
-/* ─── Left panel feature items ─────────────────────────────────────────────── */
-const FEATURES = [
-  {
-    icon: <Database className="w-5 h-5" />,
-    title: 'Centralized Asset Inventory',
-    desc: 'Search, filter and classify all your servers, computers and cloud instances.',
-  },
-  {
-    icon: <Server className="w-5 h-5" />,
-    title: 'Automated Rapid7 Integration',
-    desc: 'Sync assets automatically via the InsightVM, InsightCloudSec and InsightIDR APIs.',
-  },
-  {
-    icon: <Grid className="w-5 h-5" />,
-    title: 'Excel Spreadsheet Importer',
-    desc: 'Add assets in batch easily using custom spreadsheets.',
-  },
-  {
-    icon: <ShieldCheck className="w-5 h-5" />,
-    title: 'MFA & Data Isolation',
-    desc: 'Robust access control with Multi-Factor Authentication per isolated tenant.',
-  },
-];
+
 
 export function AuthForm({ onAuthenticate }: AuthFormProps) {
   const [step, setStep] = useState<Step>('credentials');
@@ -283,20 +257,6 @@ export function AuthForm({ onAuthenticate }: AuthFormProps) {
           <p className="text-lg text-slate-400 max-w-md leading-relaxed mb-12">
             Control, automation, and management of cyber asset inventory and direct Rapid7 integration.
           </p>
-
-          <div className="space-y-5">
-            {FEATURES.map((f, i) => (
-              <div key={i} className="flex items-start gap-4 group">
-                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-blue-400 group-hover:bg-blue-500/10 group-hover:border-blue-500/20 transition-all duration-300">
-                  {f.icon}
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-200 mb-0.5">{f.title}</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">{f.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         <div className="flex items-center gap-3 text-xs text-slate-600">
